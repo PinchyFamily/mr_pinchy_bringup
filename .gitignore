@@ -3,3 +3,4 @@ install/
 log/
 __pycache__/
 *.pyc
+config/secrets.yaml

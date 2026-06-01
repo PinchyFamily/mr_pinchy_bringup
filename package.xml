@@ -13,6 +13,9 @@
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>ublox_dgnss</exec_depend>
   <exec_depend>ublox_dgnss_node</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>rtcm_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>ublox_nav_sat_fix_hp_node</exec_depend>
 
   <export>
