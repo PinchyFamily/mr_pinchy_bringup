@@ -1,0 +1,46 @@
+# Mr Pinchy vehicle bringup configuration.
+# Override at launch time: vehicle_config:=/path/to/custom.yaml
+# Launch args (sonar, dvl, mavros, gnss, nucleus_ip, sonar_params_file, fcu_url)
+# take precedence over values here when explicitly set.
+
+vehicle:
+  name: pinchy
+
+network:
+  nucleus_ip: "192.168.32.23"
+  nucleus_vendor: "nortek"
+  nucleus_connect_delay: 3.0
+  nucleus_start_delay: 6.0
+  mavros_fcu_url: "udp-b://0.0.0.0:14550@14550"
+  # Empty string resolves to config/sonar.yaml in this package at launch time.
+  sonar_params_file: ""
+
+subsystems:
+  sonar: true
+  dvl: true
+  mavros: true
+  gnss: true
+
+extrinsics:
+  base_frame: base_link
+  sonar:
+    child_frame: sonar_link
+    xyz: [0.165, 0.037, -0.114]
+    rpy: [0.0, -0.3926991, 0.0]
+  camera:
+    child_frame: hd_camera_link
+    xyz: [0.165, -0.052, -0.114]
+    rpy: [1.5707963, 0.0, 1.1780972]
+  dvl:
+    child_frame: dvl_link
+    xyz: [0.0, -0.106, 0.265]
+    rpy: [0.0, 0.0, 0.0]
+
+bridges:
+  dvl_type: nucleus
+  dvl_frame: dvl_link
+  depth_frame: icp_map
+  depth_topic: /global_position/rel_alt
+  relative_depth: false
+  ned: false
+  ahrs: true

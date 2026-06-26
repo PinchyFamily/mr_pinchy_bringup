@@ -1,0 +1,22 @@
+sonar_node:
+  ros__parameters:
+    sonar_ip: "192.168.32.109"
+    frame_id: "/sonar_link"
+
+    acoustics_enabled: true
+    speed_of_sound: 1480.0
+    mode: "low-frequency"
+    salinity: "fresh"
+    range_min: 0.3
+    range_max: 15.0
+
+    udp_mode: "unicast"
+    interface_ip: "192.168.32.131"
+    unicast_destination_ip: "192.168.32.131"
+    unicast_destination_port: 4747
+
+    topic_point_cloud: "/sonar/point_cloud"
+    topic_range_image: "/sonar/range_image"
+    topic_camera_info: "~/camera_info"
+
+    diagnostics_period: 5.0

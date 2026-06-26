@@ -9,6 +9,10 @@ install(DIRECTORY launch config scripts
 install(PROGRAMS
   scripts/test_ntrip.py
   scripts/ntrip_client_py.py
+  scripts/nucleus_dvl_bridge.py
+  scripts/depth_bridge.py
+  scripts/nucleus_imu_bridge.py
+  scripts/nucleus_ahrs_bridge.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
