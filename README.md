@@ -2,8 +2,6 @@
 
 ROS 2 (Humble) bringup package for **Mr Pinchy** — the single entry point for vehicle hardware: GNSS, FCU link (MAVROS), sonar, DVL, sensor bridges, and static transforms.
 
-This package is self-contained for hardware bringup and does **not** depend on `sonar_localization` (localization/mapping is a separate stack).
-
 ## Prerequisites
 
 - ROS 2 Humble
@@ -202,10 +200,6 @@ Declared in `package.xml`:
 - `tf2_ros`
 - `geometry_msgs`, `nav_msgs`, `sensor_msgs`, `std_msgs`, `rtcm_msgs`
 - `python3-numpy`, `python3-yaml`
-
-### Not required
-
-- `sonar_localization` — localization and mapping is a separate stack
 
 ## Configuration
 
