@@ -36,6 +36,7 @@ def launch_setup(context, *args, **kwargs):
         'dvl': _launch_arg(context, 'dvl'),
         'mavros': _launch_arg(context, 'mavros'),
         'nucleus_ip': _launch_arg(context, 'nucleus_ip'),
+        'sonar_ip': _launch_arg(context, 'sonar_ip'),
         'fcu_url': _launch_arg(context, 'fcu_url'),
         'sonar_params_file': _launch_arg(context, 'sonar_params_file'),
     }
@@ -47,7 +48,6 @@ def launch_setup(context, *args, **kwargs):
     extrinsics = resolved['extrinsics']
 
     pkg_share = get_package_share_directory('mr_pinchy_bringup')
-    sonar_pkg = get_package_share_directory('waterlinked_sonar_3d15')
     log_level = _launch_arg(context, 'log_level')
 
     actions = []
@@ -61,14 +61,16 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={'log_level': log_level}.items(),
     ))
 
-    # --- Sonar: Water Linked 3D15 driver (point cloud + sonar topics) ---
+    # --- Sonar: Water Linked 3D15 driver (params from pinchy.yaml sonar section) ---
     actions.append(IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(sonar_pkg, 'launch', 'sonar_3d15.launch.py')
+            os.path.join(pkg_share, 'launch', 'sonar.launch.py')
         ),
         condition=IfCondition(_bool_to_launch(subsystems['sonar'])),
         launch_arguments={
-            'params_file': network['sonar_params_file'],
+            'vehicle_config': vehicle_config_path,
+            'sonar_params_file': _launch_arg(context, 'sonar_params_file'),
+            'sonar_ip': _launch_arg(context, 'sonar_ip'),
         }.items(),
     ))
 
@@ -158,9 +160,6 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     default_config = default_vehicle_config_path()
-    default_sonar = os.path.join(
-        get_package_share_directory('mr_pinchy_bringup'), 'config', 'sonar.yaml'
-    )
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -204,6 +203,11 @@ def generate_launch_description():
             description='Nucleus DVL IP (empty = use vehicle config)',
         ),
         DeclareLaunchArgument(
+            'sonar_ip',
+            default_value='',
+            description='Water Linked sonar IP (empty = use vehicle config)',
+        ),
+        DeclareLaunchArgument(
             'fcu_url',
             default_value='',
             description='MAVROS FCU URL (empty = use vehicle config)',
@@ -211,7 +215,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'sonar_params_file',
             default_value='',
-            description=f'Sonar params YAML (empty = use vehicle config, default {default_sonar})',
+            description='Optional sonar params YAML override (empty = use pinchy.yaml sonar section)',
         ),
         OpaqueFunction(function=launch_setup),
     ])

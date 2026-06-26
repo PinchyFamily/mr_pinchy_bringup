@@ -37,9 +37,65 @@ def default_vehicle_config_path():
     return os.path.join(pkg_share, 'config', 'pinchy.yaml')
 
 
-def default_sonar_params_path():
-    pkg_share = get_package_share_directory('mr_pinchy_bringup')
-    return os.path.join(pkg_share, 'config', 'sonar.yaml')
+SONAR_DEFAULTS = {
+    'sonar_ip': '192.168.194.96',
+    'frame_id': 'sonar_link',
+    'acoustics_enabled': True,
+    'speed_of_sound': 1480.0,
+    'mode': 'low-frequency',
+    'salinity': 'salt',
+    'range_min': 0.3,
+    'range_max': 15.0,
+    'udp_mode': 'multicast',
+    'interface_ip': '0.0.0.0',
+    'unicast_destination_ip': '',
+    'unicast_destination_port': 0,
+    'topic_point_cloud': '~/point_cloud',
+    'topic_range_image': '~/range_image',
+    'topic_intensity_image': '~/intensity_image',
+    'topic_camera_info': '~/camera_info',
+    'diagnostics_period': 5.0,
+}
+
+
+def _load_sonar_params_file(path):
+    with open(path, 'r', encoding='utf-8') as handle:
+        data = yaml.safe_load(handle) or {}
+    if 'sonar_node' in data:
+        return dict(data['sonar_node'].get('ros__parameters', {}))
+    return dict(data)
+
+
+def _resolve_sonar_frame_id(frame_id, extrinsics):
+    if frame_id:
+        return frame_id
+    child_frame = extrinsics['sonar']['child_frame']
+    if child_frame.startswith('/'):
+        return child_frame
+    return f'/{child_frame}'
+
+
+def resolve_sonar(config, overrides, extrinsics):
+    """Resolve Water Linked sonar driver parameters."""
+    sonar_section = dict(config.get('sonar', {}))
+    params_file = overrides.get('sonar_params_file', '')
+    if not params_file:
+        params_file = sonar_section.pop('params_file', '')
+
+    if params_file:
+        params = _load_sonar_params_file(params_file)
+    else:
+        params = sonar_section
+
+    resolved = dict(SONAR_DEFAULTS)
+    resolved.update(params)
+
+    sonar_ip = overrides.get('sonar_ip', '')
+    if sonar_ip:
+        resolved['sonar_ip'] = sonar_ip
+
+    resolved['frame_id'] = _resolve_sonar_frame_id(resolved.get('frame_id', ''), extrinsics)
+    return resolved
 
 
 def load_vehicle_config(path):
@@ -87,12 +143,6 @@ def resolve_network(config, overrides):
     if fcu_url:
         network['mavros_fcu_url'] = fcu_url
 
-    sonar_params_file = overrides.get('sonar_params_file', '')
-    if sonar_params_file:
-        network['sonar_params_file'] = sonar_params_file
-    elif not network.get('sonar_params_file'):
-        network['sonar_params_file'] = default_sonar_params_path()
-
     network.setdefault('nucleus_ip', '192.168.32.23')
     network.setdefault('nucleus_vendor', 'nortek')
     network.setdefault('nucleus_connect_delay', 3.0)
@@ -127,11 +177,13 @@ def resolve_extrinsics(config):
 
 def load_resolved_config(vehicle_config_path, profile, overrides):
     config = load_vehicle_config(vehicle_config_path)
+    extrinsics = resolve_extrinsics(config)
     return {
         'subsystems': resolve_subsystems(config, profile, overrides),
         'network': resolve_network(config, overrides),
         'bridges': resolve_bridges(config),
-        'extrinsics': resolve_extrinsics(config),
+        'extrinsics': extrinsics,
+        'sonar': resolve_sonar(config, overrides, extrinsics),
     }
 
 

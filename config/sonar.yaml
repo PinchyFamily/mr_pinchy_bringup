@@ -1,3 +1,6 @@
+# Optional Water Linked sonar params override (sonar_node/ros__parameters format).
+# Primary configuration lives in pinchy.yaml under the sonar: section.
+# Use via pinchy.yaml sonar.params_file or launch arg sonar_params_file:=/path/to/this/file
 sonar_node:
   ros__parameters:
     sonar_ip: "192.168.32.109"

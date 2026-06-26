@@ -1,6 +1,6 @@
 # Mr Pinchy vehicle bringup configuration.
 # Override at launch time: vehicle_config:=/path/to/custom.yaml
-# Launch args (sonar, dvl, mavros, gnss, nucleus_ip, sonar_params_file, fcu_url)
+# Launch args (sonar, dvl, mavros, gnss, nucleus_ip, sonar_ip, sonar_params_file, fcu_url)
 # take precedence over values here when explicitly set.
 
 vehicle:
@@ -12,8 +12,27 @@ network:
   nucleus_connect_delay: 3.0
   nucleus_start_delay: 6.0
   mavros_fcu_url: "udp-b://0.0.0.0:14550@14550"
-  # Empty string resolves to config/sonar.yaml in this package at launch time.
-  sonar_params_file: ""
+
+sonar:
+  # Optional external params YAML (sonar_node/ros__parameters format). Empty = use fields below.
+  params_file: ""
+  sonar_ip: "192.168.32.109"
+  # Empty string uses extrinsics.sonar.child_frame (with leading /).
+  frame_id: ""
+  acoustics_enabled: true
+  speed_of_sound: 1480.0
+  mode: "low-frequency"
+  salinity: "fresh"
+  range_min: 0.3
+  range_max: 15.0
+  udp_mode: "unicast"
+  interface_ip: "192.168.32.131"
+  unicast_destination_ip: "192.168.32.131"
+  unicast_destination_port: 4747
+  topic_point_cloud: "/sonar/point_cloud"
+  topic_range_image: "/sonar/range_image"
+  topic_camera_info: "~/camera_info"
+  diagnostics_period: 5.0
 
 subsystems:
   sonar: true

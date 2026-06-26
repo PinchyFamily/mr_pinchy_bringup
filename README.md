@@ -28,6 +28,7 @@ source install/setup.bash
 |---|---|---|
 | `bringup.launch.py` | **Full vehicle** — GNSS, sonar, MAVROS, Nucleus DVL, bridges, static TFs | Default on-vehicle boot; one command for everything |
 | `gnss.launch.py` | **GNSS only** — u-blox driver, NTRIP, NavSatFix | Testing GPS independently |
+| `sonar.launch.py` | **Sonar only** — Water Linked 3D15 driver | Testing sonar independently |
 | `mavros.launch.py` | **FCU link only** — PX4 MAVROS node | FCU debugging; included by bringup |
 | `sensors_bridge.launch.py` | **Bridge nodes only** — DVL/depth/IMU/AHRS converters | Bridge debugging; included by bringup |
 
@@ -37,7 +38,7 @@ flowchart TD
     bringup --> gnss[gnss.launch.py]
     bringup --> mavros[mavros.launch.py]
     bringup --> bridges[sensors_bridge.launch.py]
-    bringup --> sonarExt[waterlinked_sonar_3d15]
+    bringup --> sonar[sonar.launch.py]
     bringup --> nucleusExt[nucleus_driver_ros2]
     bringup --> staticTF["static_transform_publisher x3"]
 ```
@@ -75,8 +76,9 @@ Arguments:
 | `dvl` | _(empty)_ | Override DVL enable |
 | `mavros` | _(empty)_ | Override MAVROS enable |
 | `nucleus_ip` | _(empty)_ | Nucleus DVL IP (empty = use vehicle config) |
+| `sonar_ip` | _(empty)_ | Water Linked sonar IP (empty = use vehicle config) |
 | `fcu_url` | _(empty)_ | MAVROS FCU URL (empty = use vehicle config) |
-| `sonar_params_file` | _(empty)_ | Sonar params YAML (empty = use vehicle config) |
+| `sonar_params_file` | _(empty)_ | Optional sonar params YAML override (empty = use `pinchy.yaml` `sonar:` section) |
 
 Disable individual subsystems (overrides profile):
 
@@ -117,6 +119,27 @@ Verify output:
 ros2 topic echo /fix
 ```
 
+### Sonar
+
+```bash
+ros2 launch mr_pinchy_bringup sonar.launch.py
+```
+
+Arguments:
+
+| Argument | Default | Description |
+|---|---|---|
+| `vehicle_config` | `config/pinchy.yaml` | Vehicle YAML with `sonar:` section |
+| `sonar_ip` | _(empty)_ | Sonar IP override |
+| `sonar_params_file` | _(empty)_ | Optional external params YAML override |
+| `namespace` | _(empty)_ | Node namespace |
+
+Verify output:
+
+```bash
+ros2 topic echo /sonar/point_cloud
+```
+
 ### Sensor bridges
 
 ```bash
@@ -146,12 +169,13 @@ Vehicle-specific settings live in [`config/pinchy.yaml`](config/pinchy.yaml). Ed
 
 | Section | Contents |
 |---|---|
-| `network` | Nucleus IP, MAVROS FCU URL, sonar params file path, DVL connect delays |
+| `network` | Nucleus IP, MAVROS FCU URL, DVL connect delays |
+| `sonar` | Water Linked sonar IP, UDP/network, acoustics, and topic names |
 | `subsystems` | Default enable flags for GNSS, sonar, DVL, MAVROS |
 | `extrinsics` | Static transforms from `base_link` to sonar, camera, and DVL frames |
 | `bridges` | DVL type, frames, depth topic, AHRS enable |
 
-Sonar network settings (IP, interface, UDP mode) live in [`config/sonar.yaml`](config/sonar.yaml), referenced from `pinchy.yaml`. This keeps all Mr Pinchy network addresses in one package.
+Sonar `frame_id` defaults to `extrinsics.sonar.child_frame` when left empty in `pinchy.yaml`. Set `sonar.params_file` to an external YAML (same format as `config/sonar.yaml`) to replace the inline `sonar:` block entirely.
 
 Use a custom config file at launch time:
 
@@ -207,8 +231,8 @@ Vehicle-specific parameters live in `config/`. Edit these instead of modifying l
 
 | File | Purpose |
 |---|---|
-| `pinchy.yaml` | Vehicle network IPs, extrinsics, bridge defaults, subsystem enables |
-| `sonar.yaml` | Water Linked sonar IP, UDP/network, and acoustic settings |
+| `pinchy.yaml` | Vehicle network IPs, sonar driver settings, extrinsics, bridge defaults, subsystem enables |
+| `sonar.yaml` | Optional legacy sonar params file (use via `sonar.params_file` or `sonar_params_file:=`) |
 | `gnss.yaml` | u-blox device family, measurement rates, USB message outputs |
 
 ### Secrets
@@ -239,4 +263,4 @@ IP and connect timing are set in `config/pinchy.yaml` under `network:`. Override
 
 ### Sonar
 
-Water Linked 3D15 sonar settings are in `config/sonar.yaml` (IP, interface, UDP mode). Static extrinsic is in `config/pinchy.yaml` under `extrinsics:`. Override the params file at launch with `sonar_params_file:=/path/to/sonar.yaml`.
+Water Linked 3D15 settings are in `config/pinchy.yaml` under `sonar:` (IP, interface, UDP mode, acoustics). Launch sonar alone with `ros2 launch mr_pinchy_bringup sonar.launch.py`, or override the IP at full bringup with `sonar_ip:=192.168.x.x`. Static extrinsic is under `extrinsics:` in the same file.
