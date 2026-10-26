@@ -38,6 +38,7 @@ subsystems:
   dvl: true
   mavros: true
   gnss: true
+  camera: true
 
 extrinsics:
   base_frame: base_link

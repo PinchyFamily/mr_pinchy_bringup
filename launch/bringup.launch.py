@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Full Mr Pinchy vehicle bringup: GNSS, FCU, sonar, DVL, sensor bridges, and static TFs."""
+"""Full Mr Pinchy vehicle bringup: GNSS, FCU, sonar, DVL, camera, sensor bridges, and static TFs."""
 import os
 import sys
 
@@ -37,6 +37,7 @@ def launch_setup(context, *args, **kwargs):
         'sonar': _launch_arg(context, 'sonar'),
         'dvl': _launch_arg(context, 'dvl'),
         'mavros': _launch_arg(context, 'mavros'),
+        'camera': _launch_arg(context, 'camera'),
         'nucleus_ip': _launch_arg(context, 'nucleus_ip'),
         'sonar_ip': _launch_arg(context, 'sonar_ip'),
         'fcu_url': _launch_arg(context, 'fcu_url'),
@@ -75,6 +76,15 @@ def launch_setup(context, *args, **kwargs):
             'sonar_params_file': _launch_arg(context, 'sonar_params_file'),
             'sonar_ip': _launch_arg(context, 'sonar_ip'),
         }.items(),
+    ))
+
+    # --- Camera: auxiliary exploreHD via usb_cam (params from config/camera.yaml) ---
+    actions.append(IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_share, 'launch', 'camera.launch.py')
+        ),
+        condition=IfCondition(_bool_to_launch(subsystems['camera'])),
+        launch_arguments={'vehicle_config': vehicle_config_path}.items(),
     ))
 
     # --- FCU: MAVROS PX4 link (attitude, position, RC, etc. under /mavros/) ---
@@ -209,6 +219,11 @@ def generate_launch_description():
             'mavros',
             default_value='',
             description='Enable MAVROS (empty = use profile/config)',
+        ),
+        DeclareLaunchArgument(
+            'camera',
+            default_value='',
+            description='Enable auxiliary exploreHD camera (empty = use profile/config)',
         ),
         DeclareLaunchArgument(
             'nucleus_ip',

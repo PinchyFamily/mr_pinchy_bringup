@@ -26,10 +26,11 @@ source install/setup.bash
 
 | Launch file | Scope | Use when |
 |---|---|---|
-| `bringup.launch.py` | **Full vehicle** — GNSS, sonar, MAVROS, Nucleus DVL, bridges, static TFs | Default on-vehicle boot; one command for everything |
+| `bringup.launch.py` | **Full vehicle** — GNSS, sonar, MAVROS, Nucleus DVL, camera, bridges, static TFs | Default on-vehicle boot; one command for everything |
 | `gnss.launch.py` | **GNSS only** — u-blox driver, NTRIP, NavSatFix | Testing GPS independently |
 | `sonar.launch.py` | **Sonar only** — Water Linked 3D15 driver | Testing sonar independently |
 | `imu.launch.py` | **IMU only** — STIM300 driver, sets the sensor sample rate | Testing the IMU independently |
+| `camera.launch.py` | **Camera only** — auxiliary DWE exploreHD via `usb_cam` | Testing the camera independently |
 | `mavros.launch.py` | **FCU link only** — PX4 MAVROS node | FCU debugging; included by bringup |
 | `sensors_bridge.launch.py` | **Bridge nodes only** — DVL/depth/IMU/AHRS converters | Bridge debugging; included by bringup |
 | `carl.launch.py` | **DVL + sonar + EKF** — Nucleus driver, Water Linked sonar, `nucleus_ekf.py`, `base_link` → `sonar_link` TF | DVL dead-reckoning with sonar, without GNSS or MAVROS |
@@ -41,6 +42,7 @@ flowchart TD
     bringup --> mavros[mavros.launch.py]
     bringup --> bridges[sensors_bridge.launch.py]
     bringup --> sonar[sonar.launch.py]
+    bringup --> camera[camera.launch.py]
     bringup --> nucleusExt[nucleus_driver_ros2]
     bringup --> staticTF["static_transform_publisher x3"]
 ```
@@ -53,12 +55,12 @@ ros2 launch mr_pinchy_bringup bringup.launch.py
 
 Launch profiles (set subsystem defaults; see [Vehicle configuration](#vehicle-configuration)):
 
-| Profile | GNSS | Sonar | DVL | MAVROS | Use when |
-|---|---|---|---|---|---|
-| `full` (default) | on | on | on | on | Normal on-vehicle operation |
-| `sensors_only` | off | on | on | on | GNSS already running or not needed |
-| `gnss_only` | on | off | off | off | GPS testing only |
-| `sim` | off | off | off | off | Bag replay — static TFs and bridges only |
+| Profile | GNSS | Sonar | DVL | MAVROS | Camera | Use when |
+|---|---|---|---|---|---|---|
+| `full` (default) | on | on | on | on | on | Normal on-vehicle operation |
+| `sensors_only` | off | on | on | on | on | GNSS already running or not needed |
+| `gnss_only` | on | off | off | off | off | GPS testing only |
+| `sim` | off | off | off | off | off | Bag replay — static TFs and bridges only |
 
 ```bash
 ros2 launch mr_pinchy_bringup bringup.launch.py profile:=sensors_only
@@ -78,6 +80,7 @@ Arguments:
 | `sonar` | _(empty)_ | Override sonar enable |
 | `dvl` | _(empty)_ | Override DVL enable |
 | `mavros` | _(empty)_ | Override MAVROS enable |
+| `camera` | _(empty)_ | Override camera enable |
 | `nucleus_ip` | _(empty)_ | Nucleus DVL IP (empty = use `nucleus.host` from the secrets file) |
 | `sonar_ip` | _(empty)_ | Water Linked sonar IP (empty = use vehicle config) |
 | `fcu_url` | _(empty)_ | MAVROS FCU URL (empty = use vehicle config) |
@@ -98,7 +101,7 @@ ros2 launch mr_pinchy_bringup bringup.launch.py profile:=sensors_only
 ros2 launch mr_pinchy_bringup bringup.launch.py profile:=sim
 ```
 
-Key topics started: MAVROS topics under `/mavros/`, sonar point cloud from `waterlinked_sonar_3d15`, Nucleus packets on `/nucleus_node/*`, bridged outputs on `/dvl/*` and `depth_odom`.
+Key topics started: MAVROS topics under `/mavros/`, sonar point cloud from `waterlinked_sonar_3d15`, Nucleus packets on `/nucleus_node/*`, bridged outputs on `/dvl/*` and `depth_odom`, camera images under `/explorehd/`.
 
 Static TF frames: `base_link` → `sonar_link`, `hd_camera_link`, `dvl_link`.
 
@@ -166,6 +169,30 @@ Verify output:
 ros2 topic hz /sam/core/imu
 ```
 
+### Camera
+
+The auxiliary DWE exploreHD camera, via `usb_cam`. It opens `/dev/explorehd_cam`, the symlink from the udev rule in [mr_pinchy `setup/udev`](https://github.com/PinchyFamily/mr_pinchy/tree/main/setup/udev). Driver settings are in `config/camera.yaml`; `frame_id` is taken from `extrinsics.camera.child_frame` in the vehicle config so images match the static TF.
+
+```bash
+ros2 launch mr_pinchy_bringup camera.launch.py
+```
+
+Arguments:
+
+| Argument | Default | Description |
+|---|---|---|
+| `vehicle_config` | `config/pinchy.yaml` | Vehicle YAML (camera frame from `extrinsics.camera`) |
+| `camera_params_file` | `config/camera.yaml` | `usb_cam` parameter file |
+| `camera_name` | `explorehd` | Namespace; topics are published under `/<camera_name>/` |
+
+`usb_cam` and the host's mavlink-camera-manager both open `/dev/explorehd_cam`, so only one can use the camera at a time. Launch with `camera:=false` when streaming it topside.
+
+Verify output:
+
+```bash
+ros2 topic hz /explorehd/image_raw
+```
+
 ### Sensor bridges
 
 ```bash
@@ -209,7 +236,7 @@ Use a custom config file at launch time:
 ros2 launch mr_pinchy_bringup bringup.launch.py vehicle_config:=/path/to/my_vehicle.yaml
 ```
 
-Launch arguments override config values when set explicitly (non-empty). Profiles override `subsystems` defaults unless individual `gnss`/`sonar`/`dvl`/`mavros` args are passed.
+Launch arguments override config values when set explicitly (non-empty). Profiles override `subsystems` defaults unless individual `gnss`/`sonar`/`dvl`/`mavros`/`camera` args are passed.
 
 ## Bridge nodes
 
@@ -244,6 +271,7 @@ Each node accepts ROS parameters to override `frame_id`, input/output topics, an
 | `mavros` | FCU communication (PX4) |
 | `waterlinked_sonar_3d15` | 3D sonar driver |
 | `nucleus_driver_ros2`, `interfaces` | Nortek Nucleus DVL driver + messages |
+| `usb_cam`, `image_transport` | exploreHD camera driver (`ros-humble-usb-cam`) |
 | `smarc_msgs` | SMARC message types used by DVL bridge |
 
 ### ROS / system dependencies
@@ -262,6 +290,7 @@ Vehicle-specific parameters live in `config/`. Edit these instead of modifying l
 | File | Purpose |
 |---|---|
 | `pinchy.yaml` | Vehicle network IPs, sonar driver settings, extrinsics, bridge defaults, subsystem enables |
+| `camera.yaml` | `usb_cam` settings for the exploreHD camera (device, resolution, pixel format, image controls) |
 | `sonar.yaml` | Optional legacy sonar params file (use via `sonar.params_file` or `sonar_params_file:=`) |
 | `gnss.yaml` | u-blox device family, measurement rates, USB message outputs, non-secret NTRIP settings (reference position, GGA interval) |
 | `secrets.yaml` | **Untracked.** All vehicle credentials in one place (see below) |

@@ -10,24 +10,28 @@ PROFILES = {
         'sonar': True,
         'dvl': True,
         'mavros': True,
+        'camera': True,
     },
     'sensors_only': {
         'gnss': False,
         'sonar': True,
         'dvl': True,
         'mavros': True,
+        'camera': True,
     },
     'gnss_only': {
         'gnss': True,
         'sonar': False,
         'dvl': False,
         'mavros': False,
+        'camera': False,
     },
     'sim': {
         'gnss': False,
         'sonar': False,
         'dvl': False,
         'mavros': False,
+        'camera': False,
     },
 }
 
@@ -145,7 +149,7 @@ def resolve_subsystems(config, profile, overrides):
     subsystems = dict(config.get('subsystems', {}))
     subsystems.update(PROFILES[profile_name])
 
-    for key in ('gnss', 'sonar', 'dvl', 'mavros'):
+    for key in ('gnss', 'sonar', 'dvl', 'mavros', 'camera'):
         override = overrides.get(key, '')
         if override:
             subsystems[key] = _parse_bool(override)
