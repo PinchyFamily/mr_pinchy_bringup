@@ -1,0 +1,28 @@
+# STIM300 IMU driver parameters (stim300_driver node).
+# Use via imu.launch.py (default) or imu_params_file:=/path/to/this/file
+# The wildcard node name lets the file apply under any namespace.
+/**:
+  ros__parameters:
+    # Stable path of the FTDI USB-RS422 cable (/dev/ttyUSBx can change between plugs).
+    device_name: "/dev/serial/by-id/usb-FTDI_USB-RS422_Cable_FT1JNN7R-if00-port0"
+    gravity: 9.80665
+
+    # Sample rate the driver sets on the sensor at start-up: 125, 250, 500, 1000 or 2000.
+    # 0 leaves the sensor as it is (the unit ships at 2000 Hz, which the driver cannot keep up with).
+    configure_sample_rate: 250
+    # Low-pass filter -3dB frequency set on the sensor: 16, 33, 66, 131 or 262 (0 = leave as is).
+    # The unit ships at 262 Hz, above the Nyquist frequency of a 250 Hz sample rate (aliasing).
+    # A common rule is a cut-off of about a quarter of the sample rate or less: 66 Hz at 250 Hz.
+    configure_lp_filter: 66
+    # false: the settings last until the sensor is powered off and is set again on every start.
+    # true: also store them in the sensor's flash (permanent, limited to 10000 saves).
+    save_config_to_flash: false
+
+    # Message contents. Covariance diagonals are [x, y, z]; the defaults come from a pool test of another unit.
+    frame_id: "imu_link"
+    imu_topic: "core/imu"
+    angular_velocity_covariance: [2.7474e-6, 2.7474e-6, 7.312e-6]
+    linear_acceleration_covariance: [4.1915e-4, 4.1915e-4, 1.8995e-5]
+
+    # Loop rate used until the driver has read the sensor's own configuration.
+    sample_rate: 250

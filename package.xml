@@ -20,6 +20,7 @@
   <exec_depend>nucleus_driver_ros2</exec_depend>
   <exec_depend>interfaces</exec_depend>
   <exec_depend>smarc_msgs</exec_depend>
+  <exec_depend>stim300</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>

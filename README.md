@@ -29,6 +29,7 @@ source install/setup.bash
 | `bringup.launch.py` | **Full vehicle** — GNSS, sonar, MAVROS, Nucleus DVL, bridges, static TFs | Default on-vehicle boot; one command for everything |
 | `gnss.launch.py` | **GNSS only** — u-blox driver, NTRIP, NavSatFix | Testing GPS independently |
 | `sonar.launch.py` | **Sonar only** — Water Linked 3D15 driver | Testing sonar independently |
+| `imu.launch.py` | **IMU only** — STIM300 driver, sets the sensor sample rate | Testing the IMU independently |
 | `mavros.launch.py` | **FCU link only** — PX4 MAVROS node | FCU debugging; included by bringup |
 | `sensors_bridge.launch.py` | **Bridge nodes only** — DVL/depth/IMU/AHRS converters | Bridge debugging; included by bringup |
 
@@ -140,6 +141,29 @@ Verify output:
 ros2 topic echo /sonar/point_cloud
 ```
 
+### IMU
+
+```bash
+ros2 launch mr_pinchy_bringup imu.launch.py
+```
+
+Parameters live in [`config/imu.yaml`](config/imu.yaml). On start the driver sets the STIM300 sample rate (`configure_sample_rate`, 250 Hz by default) and low-pass filter (`configure_lp_filter`, 66 Hz by default) through the sensor's Service Mode. The `stim300` README lists every parameter and how to choose the filter for a sample rate. Without `save_config_to_flash` the setting lasts until the sensor is powered off, and is set again on every start. The driver needs `stim300` and `sam_msgs` in the workspace.
+
+Arguments:
+
+| Argument | Default | Description |
+|---|---|---|
+| `imu_params_file` | `config/imu.yaml` | IMU parameter YAML |
+| `device` | _(empty)_ | Serial device override (empty = use params file) |
+| `sample_rate` | _(empty)_ | Sensor sample rate override in Hz (empty = use params file) |
+| `namespace` | `sam` | Node namespace |
+
+Verify output:
+
+```bash
+ros2 topic hz /sam/core/imu
+```
+
 ### Sensor bridges
 
 ```bash
@@ -235,6 +259,7 @@ Vehicle-specific parameters live in `config/`. Edit these instead of modifying l
 | `sonar.yaml` | Optional legacy sonar params file (use via `sonar.params_file` or `sonar_params_file:=`) |
 | `gnss.yaml` | u-blox device family, measurement rates, USB message outputs, non-secret NTRIP settings (reference position, GGA interval) |
 | `secrets.yaml` | **Untracked.** All vehicle credentials in one place (see below) |
+| `imu.yaml` | STIM300 serial device, sensor sample rate and LP filter, message frame, topic and covariances |
 
 ### Secrets
 
