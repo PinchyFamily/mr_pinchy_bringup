@@ -14,7 +14,9 @@ from launch_ros.actions import Node
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from vehicle_config import (  # noqa: E402
     _bool_to_launch,
+    default_secrets_path,
     default_vehicle_config_path,
+    load_nucleus_secrets,
     load_resolved_config,
     static_transform_node,
 )
@@ -49,6 +51,7 @@ def launch_setup(context, *args, **kwargs):
 
     pkg_share = get_package_share_directory('mr_pinchy_bringup')
     log_level = _launch_arg(context, 'log_level')
+    secrets_file = _launch_arg(context, 'secrets_file')
 
     actions = []
 
@@ -58,7 +61,7 @@ def launch_setup(context, *args, **kwargs):
             os.path.join(pkg_share, 'launch', 'gnss.launch.py')
         ),
         condition=IfCondition(_bool_to_launch(subsystems['gnss'])),
-        launch_arguments={'log_level': log_level}.items(),
+        launch_arguments={'log_level': log_level, 'secrets_file': secrets_file}.items(),
     ))
 
     # --- Sonar: Water Linked 3D15 driver (params from pinchy.yaml sonar section) ---
@@ -103,6 +106,11 @@ def launch_setup(context, *args, **kwargs):
 
     # --- DVL: Nucleus driver node, then timed TCP connect and start streaming ---
     dvl_enabled = _bool_to_launch(subsystems['dvl'])
+    # Host and password come from secrets.yaml; nucleus_ip:= still overrides the host.
+    nucleus = {'host': '', 'password': ''}
+    if subsystems['dvl']:
+        nucleus = load_nucleus_secrets(secrets_file)
+    nucleus_host = network.get('nucleus_ip') or nucleus['host']
     actions.append(Node(
         package='nucleus_driver_ros2',
         executable='nucleus_node',
@@ -119,7 +127,7 @@ def launch_setup(context, *args, **kwargs):
                 package='nucleus_driver_ros2',
                 executable='connect_tcp',
                 name='nucleus_connect',
-                arguments=[network['nucleus_ip'], network['nucleus_vendor']],
+                arguments=[nucleus_host, nucleus['password']],
                 output='screen',
                 emulate_tty=True,
             )
@@ -168,6 +176,11 @@ def generate_launch_description():
             description='Path to vehicle YAML config file',
         ),
         DeclareLaunchArgument(
+            'secrets_file',
+            default_value=default_secrets_path(),
+            description='Path to secrets YAML file (NTRIP and Nucleus credentials)',
+        ),
+        DeclareLaunchArgument(
             'profile',
             default_value='full',
             description='Launch preset: full, sensors_only, gnss_only, or sim',
@@ -200,7 +213,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'nucleus_ip',
             default_value='',
-            description='Nucleus DVL IP (empty = use vehicle config)',
+            description='Nucleus DVL IP (empty = use nucleus.host from secrets file)',
         ),
         DeclareLaunchArgument(
             'sonar_ip',

@@ -37,6 +37,28 @@ def default_vehicle_config_path():
     return os.path.join(pkg_share, 'config', 'pinchy.yaml')
 
 
+NUCLEUS_SECRET_KEYS = ('host', 'password')
+
+
+def default_secrets_path():
+    pkg_share = get_package_share_directory('mr_pinchy_bringup')
+    return os.path.join(pkg_share, 'config', 'secrets.yaml')
+
+
+def load_nucleus_secrets(path):
+    """Return the Nucleus DVL host and password from the ``nucleus`` section of secrets.yaml."""
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f'secrets file not found: {path} '
+            '(copy config/secrets.yaml.example to config/secrets.yaml)')
+    with open(path, 'r', encoding='utf-8') as handle:
+        section = (yaml.safe_load(handle) or {}).get('nucleus') or {}
+    missing = [k for k in NUCLEUS_SECRET_KEYS if section.get(k) in (None, '', 'CHANGE_ME')]
+    if missing:
+        raise KeyError(f'set nucleus.{", nucleus.".join(missing)} in {path}')
+    return {k: str(section[k]) for k in NUCLEUS_SECRET_KEYS}
+
+
 SONAR_DEFAULTS = {
     'sonar_ip': '192.168.194.96',
     'frame_id': 'sonar_link',
@@ -143,8 +165,6 @@ def resolve_network(config, overrides):
     if fcu_url:
         network['mavros_fcu_url'] = fcu_url
 
-    network.setdefault('nucleus_ip', '192.168.32.23')
-    network.setdefault('nucleus_vendor', 'nortek')
     network.setdefault('nucleus_connect_delay', 3.0)
     network.setdefault('nucleus_start_delay', 6.0)
     network.setdefault('mavros_fcu_url', 'udp-b://0.0.0.0:14550@14550')

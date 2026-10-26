@@ -32,6 +32,7 @@ source install/setup.bash
 | `imu.launch.py` | **IMU only** — STIM300 driver, sets the sensor sample rate | Testing the IMU independently |
 | `mavros.launch.py` | **FCU link only** — PX4 MAVROS node | FCU debugging; included by bringup |
 | `sensors_bridge.launch.py` | **Bridge nodes only** — DVL/depth/IMU/AHRS converters | Bridge debugging; included by bringup |
+| `carl.launch.py` | **DVL + sonar + EKF** — Nucleus driver, Water Linked sonar, `nucleus_ekf.py`, `base_link` → `sonar_link` TF | DVL dead-reckoning with sonar, without GNSS or MAVROS |
 
 ```mermaid
 flowchart TD
@@ -70,13 +71,14 @@ Arguments:
 | Argument | Default | Description |
 |---|---|---|
 | `vehicle_config` | `config/pinchy.yaml` | Vehicle YAML (IPs, extrinsics, bridge defaults) |
+| `secrets_file` | `config/secrets.yaml` | Secrets file (NTRIP credentials, Nucleus host and password) |
 | `profile` | `full` | Launch preset: `full`, `sensors_only`, `gnss_only`, `sim` |
 | `log_level` | `INFO` | ROS log level for GNSS nodes |
 | `gnss` | _(empty)_ | Override GNSS enable (`true`/`false`; empty = use profile) |
 | `sonar` | _(empty)_ | Override sonar enable |
 | `dvl` | _(empty)_ | Override DVL enable |
 | `mavros` | _(empty)_ | Override MAVROS enable |
-| `nucleus_ip` | _(empty)_ | Nucleus DVL IP (empty = use vehicle config) |
+| `nucleus_ip` | _(empty)_ | Nucleus DVL IP (empty = use `nucleus.host` from the secrets file) |
 | `sonar_ip` | _(empty)_ | Water Linked sonar IP (empty = use vehicle config) |
 | `fcu_url` | _(empty)_ | MAVROS FCU URL (empty = use vehicle config) |
 | `sonar_params_file` | _(empty)_ | Optional sonar params YAML override (empty = use `pinchy.yaml` `sonar:` section) |
@@ -193,7 +195,7 @@ Vehicle-specific settings live in [`config/pinchy.yaml`](config/pinchy.yaml). Ed
 
 | Section | Contents |
 |---|---|
-| `network` | Nucleus IP, MAVROS FCU URL, DVL connect delays |
+| `network` | MAVROS FCU URL, DVL connect delays (Nucleus host and password are in `secrets.yaml`) |
 | `sonar` | Water Linked sonar IP, UDP/network, acoustics, and topic names |
 | `subsystems` | Default enable flags for GNSS, sonar, DVL, MAVROS |
 | `extrinsics` | Static transforms from `base_link` to sonar, camera, and DVL frames |
@@ -221,6 +223,10 @@ Python bridge nodes in `scripts/` convert vendor-specific messages to standard R
 | `nucleus_ahrs_bridge` | `/nucleus_node/ahrs_packets` | `/dvl/ahrs_imu` | `interfaces/AHRS` → `sensor_msgs/Imu` | Nucleus AHRS orientation to Imu (orientation only) |
 
 Each node accepts ROS parameters to override `frame_id`, input/output topics, and other settings. See the node source in `scripts/` for the full parameter list.
+
+### Nucleus EKF
+
+`nucleus_ekf.py` (started by `carl.launch.py`) is a 12-state EKF (position, attitude, linear and angular velocity) that fuses Nucleus AHRS attitude (`/nucleus_node/ahrs_packets`) with bottom-track velocity (`/nucleus_node/bottom_track_packets`). It publishes `/nortek_dvl_ekf/odom` and the `odom` → `base_link` TF. The state is kept in NED; `odom` is published as ENU and `base_link` as FRD (not the REP-103 FLU convention). Position is dead-reckoned from DVL velocity only, so it drifts.
 
 ## Package dependencies
 
@@ -273,6 +279,7 @@ chmod 600 config/secrets.yaml
 | Section | Used by |
 |---|---|
 | `ntrip` | `gnss.launch.py` (`ntrip_client` node), `scripts/test_ntrip.py` |
+| `nucleus` | `bringup.launch.py`, `carl.launch.py` (Nucleus `connect_tcp` host and password) |
 | `access_point` | `mr_pinchy/setup/ap/install-ap.sh` (`pinchy-ap` passphrase) |
 | `wifi` | Lab Wi-Fi client (Imager / netplan), reference only |
 | `modem` | 4G modem APN / SIM PIN, reference only |
@@ -294,7 +301,7 @@ Then reload with `sudo udevadm control --reload-rules && sudo udevadm trigger`.
 
 ### Nucleus DVL
 
-IP and connect timing are set in `config/pinchy.yaml` under `network:`. Override at launch with `nucleus_ip:=192.168.x.x`. The driver connects automatically after `nucleus_connect_delay` seconds (default 3) and begins streaming after `nucleus_start_delay` seconds (default 6).
+Host and password are read from the `nucleus` section of `config/secrets.yaml`; connect timing is set in `config/pinchy.yaml` under `network:`. Override the host at launch with `nucleus_ip:=192.168.x.x`. The driver connects automatically after `nucleus_connect_delay` seconds (default 3) and begins streaming after `nucleus_start_delay` seconds (default 6).
 
 ### Sonar
 

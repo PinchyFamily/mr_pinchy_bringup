@@ -13,6 +13,7 @@ install(PROGRAMS
   scripts/depth_bridge.py
   scripts/nucleus_imu_bridge.py
   scripts/nucleus_ahrs_bridge.py
+  scripts/nucleus_ekf.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

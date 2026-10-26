@@ -7,8 +7,7 @@ vehicle:
   name: pinchy
 
 network:
-  nucleus_ip: "192.168.32.23"
-  nucleus_vendor: "nortek"
+  # Nucleus host and password live in config/secrets.yaml (nucleus section).
   nucleus_connect_delay: 3.0
   nucleus_start_delay: 6.0
   mavros_fcu_url: "udp-b://0.0.0.0:14550@14550"
