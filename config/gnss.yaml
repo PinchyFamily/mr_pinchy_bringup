@@ -14,3 +14,14 @@ ublox_dgnss:
     CFG_MSGOUT_UBX_NAV_COV_USB: 1
     CFG_MSGOUT_UBX_RXM_COR_USB: 1
     CFG_MSGOUT_UBX_RXM_RTCM_USB: 1
+
+# NTRIP client settings that are not secret. Caster, mountpoint and
+# credentials come from the ntrip section of config/secrets.yaml.
+ntrip_client:
+  ros__parameters:
+    reflat: 59.204371
+    reflon: 18.175105
+    refalt: 20.6
+    ggainterval: 10
+    use_live_gga: true
+    fix_topic: "/fix"

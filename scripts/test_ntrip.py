@@ -49,7 +49,9 @@ def main():
         sys.exit(1)
 
     with open(secrets_path) as f:
-        params = yaml.safe_load(f)['ntrip_client']['ros__parameters']
+        data = yaml.safe_load(f)
+    # Consolidated format has an `ntrip:` section; older files are ROS params files.
+    params = data['ntrip'] if 'ntrip' in data else data['ntrip_client']['ros__parameters']
 
     print(f"Connecting to {params['host']}:{params['port']}/{params['mountpoint']}")
     print(f"  user:  {params['username']}")

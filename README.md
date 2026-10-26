@@ -111,7 +111,7 @@ Arguments:
 |---|---|---|
 | `log_level` | `INFO` | ROS log level |
 | `gnss_params_file` | `config/gnss.yaml` | Path to GNSS parameter overrides |
-| `secrets_file` | `config/secrets.yaml` | NTRIP credentials |
+| `secrets_file` | `config/secrets.yaml` | Secrets file; NTRIP credentials are read from its `ntrip` section |
 
 Verify output:
 
@@ -233,16 +233,26 @@ Vehicle-specific parameters live in `config/`. Edit these instead of modifying l
 |---|---|
 | `pinchy.yaml` | Vehicle network IPs, sonar driver settings, extrinsics, bridge defaults, subsystem enables |
 | `sonar.yaml` | Optional legacy sonar params file (use via `sonar.params_file` or `sonar_params_file:=`) |
-| `gnss.yaml` | u-blox device family, measurement rates, USB message outputs |
+| `gnss.yaml` | u-blox device family, measurement rates, USB message outputs, non-secret NTRIP settings (reference position, GGA interval) |
+| `secrets.yaml` | **Untracked.** All vehicle credentials in one place (see below) |
 
 ### Secrets
 
-Credentials (e.g. NTRIP for RTK corrections) should **not** be committed. Use one of:
+Every credential the vehicle needs lives in one gitignored file, `config/secrets.yaml`. Create it from the tracked template:
 
-- Environment variables referenced in launch files
-- A `config/secrets.yaml` file added to `.gitignore`
+```bash
+cp config/secrets.yaml.example config/secrets.yaml
+chmod 600 config/secrets.yaml
+```
 
-A template is provided at `config/secrets.yaml.example` (when RTK is configured).
+| Section | Used by |
+|---|---|
+| `ntrip` | `gnss.launch.py` (`ntrip_client` node), `scripts/test_ntrip.py` |
+| `access_point` | `mr_pinchy/setup/ap/install-ap.sh` (`pinchy-ap` passphrase) |
+| `wifi` | Lab Wi-Fi client (Imager / netplan), reference only |
+| `modem` | 4G modem APN / SIM PIN, reference only |
+
+Older files in ROS params format (`ntrip_client: ros__parameters:`) are still read by `gnss.launch.py` and `test_ntrip.py`.
 
 ## Hardware
 
