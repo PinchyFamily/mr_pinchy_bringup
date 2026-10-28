@@ -33,6 +33,8 @@
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>ublox_dgnss</exec_depend>
   <exec_depend>ublox_dgnss_node</exec_depend>
+  <exec_depend>realsense2_camera</exec_depend>
+  <exec_depend>web_video_server</exec_depend>
   <exec_depend>ublox_nav_sat_fix_hp_node</exec_depend>
 
   <export>

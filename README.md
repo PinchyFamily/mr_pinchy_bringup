@@ -11,6 +11,7 @@ ROS 2 (Humble) bringup package for **Mr Pinchy** — the single entry point for 
   - `waterlinked_sonar_3d15`
   - `nucleus_driver_ros2` and `interfaces` (from [nucleus_driver](https://github.com/nortekgroup/nucleus_driver))
   - `smarc_msgs`
+  - `realsense2_camera`, `usb_cam` and `web_video_server` (only for the camera launch files)
 
 ## Building
 
@@ -30,7 +31,8 @@ source install/setup.bash
 | `gnss.launch.py` | **GNSS only** — u-blox driver, NTRIP, NavSatFix | Testing GPS independently |
 | `sonar.launch.py` | **Sonar only** — Water Linked 3D15 driver | Testing sonar independently |
 | `imu.launch.py` | **IMU only** — STIM300 driver, sets the sensor sample rate | Testing the IMU independently |
-| `camera.launch.py` | **Camera only** — auxiliary DWE exploreHD via `usb_cam` | Testing the camera independently |
+| `3d_camera.launch.py` | **3D camera only** — RealSense D435i plus a browser video server (port 8080) | Viewing depth/colour from a non-ROS device (diagnostics) |
+| `hd_camera.launch.py` | **HD camera only** — exploreHD `usb_cam` driver plus a browser video server (port 8081) | Viewing the HD camera from a non-ROS device (diagnostics) |
 | `mavros.launch.py` | **FCU link only** — PX4 MAVROS node | FCU debugging; included by bringup |
 | `sensors_bridge.launch.py` | **Bridge nodes only** — DVL/depth/IMU/AHRS converters | Bridge debugging; included by bringup |
 | `carl.launch.py` | **DVL + sonar + EKF** — Nucleus driver, Water Linked sonar, `nucleus_ekf.py`, `base_link` → `sonar_link` TF | DVL dead-reckoning with sonar, without GNSS or MAVROS |
@@ -42,7 +44,7 @@ flowchart TD
     bringup --> mavros[mavros.launch.py]
     bringup --> bridges[sensors_bridge.launch.py]
     bringup --> sonar[sonar.launch.py]
-    bringup --> camera[camera.launch.py]
+    bringup --> camera[hd_camera.launch.py]
     bringup --> nucleusExt[nucleus_driver_ros2]
     bringup --> rsp["robot_state_publisher"]
 ```
@@ -101,7 +103,7 @@ ros2 launch mr_pinchy_bringup bringup.launch.py profile:=sensors_only
 ros2 launch mr_pinchy_bringup bringup.launch.py profile:=sim
 ```
 
-Key topics started: MAVROS topics under `/mavros/`, sonar point cloud from `waterlinked_sonar_3d15`, Nucleus packets on `/nucleus_node/*`, bridged outputs on `/dvl/*` and `depth_odom`, camera images under `/explorehd/`.
+Key topics started: MAVROS topics under `/mavros/`, sonar point cloud from `waterlinked_sonar_3d15`, Nucleus packets on `/nucleus_node/*`, bridged outputs on `/dvl/*` and `depth_odom`, camera images under `/hd_camera/`.
 
 `robot_state_publisher` publishes `/robot_description` and the fixed frames on `/tf_static`: `base_link` → `sonar_link`, `hd_camera_link`, `dvl_link`. The URDF is generated from the `extrinsics` section of the vehicle config, one fixed joint per entry, so a new sensor frame only needs a new entry there.
 
@@ -169,28 +171,74 @@ Verify output:
 ros2 topic hz /sam/core/imu
 ```
 
-### Camera
-
-The auxiliary DWE exploreHD camera, via `usb_cam`. It opens `/dev/explorehd_cam`, the symlink from the udev rule in [mr_pinchy `setup/udev`](https://github.com/PinchyFamily/mr_pinchy/tree/main/setup/udev). Driver settings are in `config/camera.yaml`; `frame_id` is taken from `extrinsics.camera.child_frame` in the vehicle config so images match the robot description.
+### 3D camera
 
 ```bash
-ros2 launch mr_pinchy_bringup camera.launch.py
+ros2 launch mr_pinchy_bringup 3d_camera.launch.py
 ```
+
+Starts the RealSense D435i driver and a `web_video_server`, a diagnostic tool for viewing the camera from any browser (no ROS needed). Open `http://<host>:8080` and pick a stream. Over Tailscale use the machine's Tailscale address, e.g. `http://100.127.241.77:8080`.
+
+The server has no authentication and binds to all interfaces by default. Pass `address:=<tailscale-ip>` to restrict it to the tailnet.
 
 Arguments:
 
 | Argument | Default | Description |
 |---|---|---|
-| `vehicle_config` | `config/pinchy.yaml` | Vehicle YAML (camera frame from `extrinsics.camera`) |
-| `camera_params_file` | `config/camera.yaml` | `usb_cam` parameter file |
-| `camera_name` | `explorehd` | Namespace; topics are published under `/<camera_name>/` |
+| `realsense` | `true` | Start the RealSense node (`false` if it is already running) |
+| `color_profile` | `640x480x15` | Colour stream `WxHxFPS`, kept small for MJPEG streaming |
+| `depth_profile` | `640x480x15` | Depth stream `WxHxFPS` |
+| `address` | `0.0.0.0` | `web_video_server` bind address |
+| `port` | `8080` | `web_video_server` HTTP port |
 
-`usb_cam` and the host's mavlink-camera-manager both open `/dev/explorehd_cam`, so only one can use the camera at a time. Launch with `camera:=false` when streaming it topside.
+The depth colorizer is enabled so depth shows as a colour image in the browser.
+
+Install the packages (ROS 2 Jazzy, Ubuntu 24.04):
+
+```bash
+sudo apt install 'ros-jazzy-librealsense2*' 'ros-jazzy-realsense2-*' ros-jazzy-web-video-server
+```
+
+The camera needs the udev rule from [mr_pinchy](https://github.com/PinchyFamily/mr_pinchy) (`udev/99-realsense-d435i.rules`) to be readable without root.
 
 Verify output:
 
 ```bash
-ros2 topic hz /explorehd/image_raw
+ros2 topic hz /camera/camera/color/image_raw
+```
+
+### HD camera
+
+```bash
+ros2 launch mr_pinchy_bringup hd_camera.launch.py
+```
+
+Starts the exploreHD USB camera (`usb_cam`, YUYV 640x480 at 30 fps, settings in [`config/hd_camera.yaml`](config/hd_camera.yaml)) and its own `web_video_server` on port 8081, so it can run alongside the 3D camera. Open `http://<host>:8081`. The same no-authentication warning applies.
+
+The camera supports MJPEG up to 1920x1080, but `usb_cam`'s `mjpeg2rgb` decoder segfaults on this Jazzy/arm64 install, so the config uses uncompressed `yuyv2rgb` (limited to 640x480 by the camera). Revisit if a fixed `usb_cam` is released.
+
+The camera is opened as `/dev/explorehd_cam`, a symlink from a udev rule (`/etc/udev/rules.d/99-explorehd-camera.rules`).
+
+Arguments:
+
+| Argument | Default | Description |
+|---|---|---|
+| `params_file` | `config/hd_camera.yaml` | `usb_cam` parameter YAML |
+| `namespace` | `hd_camera` | Node namespace (publishes `/hd_camera/image_raw`) |
+| `web_server` | `true` | Start a `web_video_server` (`false` if one is already running) |
+| `address` | `0.0.0.0` | `web_video_server` bind address |
+| `port` | `8081` | `web_video_server` HTTP port |
+
+Install the driver:
+
+```bash
+sudo apt install ros-jazzy-usb-cam ros-jazzy-web-video-server
+```
+
+Verify output:
+
+```bash
+ros2 topic hz /hd_camera/image_raw
 ```
 
 ### Sensor bridges
@@ -215,6 +263,22 @@ Arguments:
 When launched via `bringup.launch.py`, bridge settings come from `config/pinchy.yaml` under the `bridges:` key.
 
 Note: only Nucleus bridge executables are installed in this package. Selecting `waterlinked` or `sim` for `dvl_type` will fail at runtime.
+
+## Visualization / diagnostics
+
+Diagnostic viewers started by the camera launch files. Open them from any device on the tailnet using the machine's Tailscale address (`100.127.241.77` on `mr-pinchy-payload`).
+
+| Port | Service | Launch file | URL |
+|---|---|---|---|
+| 8080 | `web_video_server`: RealSense D435i colour and depth (MJPEG) | `3d_camera.launch.py` | `http://100.127.241.77:8080` |
+| 8081 | `web_video_server`: exploreHD camera (MJPEG) | `hd_camera.launch.py` | `http://100.127.241.77:8081` |
+
+Notes:
+
+- Each server lists the image topics it can see and offers MJPEG, PNG, H.264, VP8 and VP9 streams. A single frame is available at `/snapshot?topic=<topic>`.
+- Servers bind to `0.0.0.0` and have **no authentication**, so they are reachable from the LAN as well as the tailnet. Pass `address:=<tailscale-ip>` to restrict one to the tailnet.
+- Change a port with `port:=<n>` on the launch file. Each server lists every image topic on the ROS graph, so either port can show either camera.
+- `hd_camera.launch.py` accepts `web_server:=false` to skip its own server.
 
 ## Vehicle configuration
 
@@ -290,7 +354,7 @@ Vehicle-specific parameters live in `config/`. Edit these instead of modifying l
 | File | Purpose |
 |---|---|
 | `pinchy.yaml` | Vehicle network IPs, sonar driver settings, extrinsics, bridge defaults, subsystem enables |
-| `camera.yaml` | `usb_cam` settings for the exploreHD camera (device, resolution, pixel format, image controls) |
+| `hd_camera.yaml` | `usb_cam` settings for the exploreHD camera (device, resolution, pixel format, frame_id) |
 | `sonar.yaml` | Optional legacy sonar params file (use via `sonar.params_file` or `sonar_params_file:=`) |
 | `gnss.yaml` | u-blox device family, measurement rates, USB message outputs, non-secret NTRIP settings (reference position, GGA interval) |
 | `secrets.yaml` | **Untracked.** All vehicle credentials in one place (see below) |
@@ -327,6 +391,10 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="1546", ATTRS{idProduct}=="*", SYMLINK+="ublo
 ```
 
 Then reload with `sudo udevadm control --reload-rules && sudo udevadm trigger`.
+
+### RealSense D435i
+
+Connects over USB 3.0 (`8086:0b3a`). See [3D camera](#3d-camera) for the launch file and viewer.
 
 ### Nucleus DVL
 

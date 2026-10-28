@@ -79,13 +79,13 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     ))
 
-    # --- Camera: auxiliary exploreHD via usb_cam (params from config/camera.yaml) ---
+    # --- Camera: auxiliary exploreHD via usb_cam (params from config/hd_camera.yaml) ---
     actions.append(IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_share, 'launch', 'camera.launch.py')
+            os.path.join(pkg_share, 'launch', 'hd_camera.launch.py')
         ),
         condition=IfCondition(_bool_to_launch(subsystems['camera'])),
-        launch_arguments={'vehicle_config': vehicle_config_path}.items(),
+        launch_arguments={'web_server': 'false'}.items(),
     ))
 
     # --- FCU: MAVROS PX4 link (attitude, position, RC, etc. under /mavros/) ---
