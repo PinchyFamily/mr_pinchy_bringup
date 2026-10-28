@@ -40,16 +40,22 @@ subsystems:
   gnss: true
   camera: true
 
+# Sensor frames relative to base_link, which is FRD (x forward, y right, z down),
+# the same convention nucleus_ekf.py publishes. xyz in m; rpy = roll, pitch, yaw in rad
+# (URDF order); negative pitch tilts a frame down. Each entry is a fixed joint in the
+# robot description published by bringup.launch.py.
 extrinsics:
   base_frame: base_link
   sonar:
+    # Pitched down 22.5 deg
     child_frame: sonar_link
     xyz: [0.165, 0.037, -0.114]
     rpy: [0.0, -0.3926991, 0.0]
   camera:
+    # Optical frame (z along the view, x right, y down in the image), pitched down 22.5 deg
     child_frame: hd_camera_link
     xyz: [0.165, -0.052, -0.114]
-    rpy: [1.5707963, 0.0, 1.1780972]
+    rpy: [1.1780972, 0.0, 1.5707963]
   dvl:
     child_frame: dvl_link
     xyz: [0.0, -0.106, 0.265]
