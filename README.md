@@ -225,7 +225,7 @@ Vehicle-specific settings live in [`config/pinchy.yaml`](config/pinchy.yaml). Ed
 | `network` | MAVROS FCU URL, DVL connect delays (Nucleus host and password are in `secrets.yaml`) |
 | `sonar` | Water Linked sonar IP, UDP/network, acoustics, and topic names |
 | `subsystems` | Default enable flags for GNSS, sonar, DVL, MAVROS |
-| `extrinsics` | Sensor frames relative to `base_link`, which is FRD (x forward, y right, z down) like the `nucleus_ekf.py` output. `xyz` in m, `rpy` = roll, pitch, yaw in rad; every entry becomes a fixed joint in the robot description |
+| `extrinsics` | Sensor frames relative to `base_link`. The axis convention is provisional: the values read as FRD (x forward, y right, z down), like the `nucleus_ekf.py` output, but this is unconfirmed and REP-103 expects FLU. `xyz` in m, `rpy` = roll, pitch, yaw in rad; every entry becomes a fixed joint in the robot description |
 | `bridges` | DVL type, frames, depth topic, AHRS enable |
 
 Sonar `frame_id` defaults to `extrinsics.sonar.child_frame` when left empty in `pinchy.yaml`. Set `sonar.params_file` to an external YAML (same format as `config/sonar.yaml`) to replace the inline `sonar:` block entirely.

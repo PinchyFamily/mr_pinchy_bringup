@@ -40,10 +40,13 @@ subsystems:
   gnss: true
   camera: true
 
-# Sensor frames relative to base_link, which is FRD (x forward, y right, z down),
-# the same convention nucleus_ekf.py publishes. xyz in m; rpy = roll, pitch, yaw in rad
-# (URDF order); negative pitch tilts a frame down. Each entry is a fixed joint in the
-# robot description published by bringup.launch.py.
+# Sensor frames relative to base_link. xyz in m; rpy = roll, pitch, yaw in rad (URDF
+# order). Each entry is a fixed joint in the robot description published by
+# bringup.launch.py.
+# PROVISIONAL: the axis convention is not documented. The values read as FRD (x forward,
+# y right, z down), matching nucleus_ekf.py's base_link: with FRD the sonar and camera
+# are pitched down 22.5 deg, as mounted. This is unconfirmed (check DVL below/port and
+# sonar/camera above base_link), and ROS REP-103 expects FLU, so the convention may change.
 extrinsics:
   base_frame: base_link
   sonar:
