@@ -25,7 +25,7 @@ def launch_setup(context, *args, **kwargs):
     if not vehicle_config_path:
         vehicle_config_path = default_vehicle_config_path()
 
-    # Match the base_link → camera static TF published by bringup.launch.py.
+    # Match the camera frame in the robot description published by bringup.launch.py.
     extrinsics = resolve_extrinsics(load_vehicle_config(vehicle_config_path))
 
     return [

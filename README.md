@@ -1,6 +1,6 @@
 # mr_pinchy_bringup
 
-ROS 2 (Humble) bringup package for **Mr Pinchy** — the single entry point for vehicle hardware: GNSS, FCU link (MAVROS), sonar, DVL, sensor bridges, and static transforms.
+ROS 2 (Humble) bringup package for **Mr Pinchy** — the single entry point for vehicle hardware: GNSS, FCU link (MAVROS), sonar, DVL, sensor bridges, and the robot description (`robot_state_publisher`).
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ source install/setup.bash
 
 | Launch file | Scope | Use when |
 |---|---|---|
-| `bringup.launch.py` | **Full vehicle** — GNSS, sonar, MAVROS, Nucleus DVL, camera, bridges, static TFs | Default on-vehicle boot; one command for everything |
+| `bringup.launch.py` | **Full vehicle** — GNSS, sonar, MAVROS, Nucleus DVL, camera, bridges, robot description | Default on-vehicle boot; one command for everything |
 | `gnss.launch.py` | **GNSS only** — u-blox driver, NTRIP, NavSatFix | Testing GPS independently |
 | `sonar.launch.py` | **Sonar only** — Water Linked 3D15 driver | Testing sonar independently |
 | `imu.launch.py` | **IMU only** — STIM300 driver, sets the sensor sample rate | Testing the IMU independently |
@@ -44,7 +44,7 @@ flowchart TD
     bringup --> sonar[sonar.launch.py]
     bringup --> camera[camera.launch.py]
     bringup --> nucleusExt[nucleus_driver_ros2]
-    bringup --> staticTF["static_transform_publisher x3"]
+    bringup --> rsp["robot_state_publisher"]
 ```
 
 ### Full bringup
@@ -60,7 +60,7 @@ Launch profiles (set subsystem defaults; see [Vehicle configuration](#vehicle-co
 | `full` (default) | on | on | on | on | on | Normal on-vehicle operation |
 | `sensors_only` | off | on | on | on | on | GNSS already running or not needed |
 | `gnss_only` | on | off | off | off | off | GPS testing only |
-| `sim` | off | off | off | off | off | Bag replay — static TFs and bridges only |
+| `sim` | off | off | off | off | off | Bag replay — robot description and bridges only |
 
 ```bash
 ros2 launch mr_pinchy_bringup bringup.launch.py profile:=sensors_only
@@ -103,7 +103,7 @@ ros2 launch mr_pinchy_bringup bringup.launch.py profile:=sim
 
 Key topics started: MAVROS topics under `/mavros/`, sonar point cloud from `waterlinked_sonar_3d15`, Nucleus packets on `/nucleus_node/*`, bridged outputs on `/dvl/*` and `depth_odom`, camera images under `/explorehd/`.
 
-Static TF frames: `base_link` → `sonar_link`, `hd_camera_link`, `dvl_link`.
+`robot_state_publisher` publishes `/robot_description` and the fixed frames on `/tf_static`: `base_link` → `sonar_link`, `hd_camera_link`, `dvl_link`. The URDF is generated from the `extrinsics` section of the vehicle config, one fixed joint per entry, so a new sensor frame only needs a new entry there.
 
 ### GNSS
 
@@ -171,7 +171,7 @@ ros2 topic hz /sam/core/imu
 
 ### Camera
 
-The auxiliary DWE exploreHD camera, via `usb_cam`. It opens `/dev/explorehd_cam`, the symlink from the udev rule in [mr_pinchy `setup/udev`](https://github.com/PinchyFamily/mr_pinchy/tree/main/setup/udev). Driver settings are in `config/camera.yaml`; `frame_id` is taken from `extrinsics.camera.child_frame` in the vehicle config so images match the static TF.
+The auxiliary DWE exploreHD camera, via `usb_cam`. It opens `/dev/explorehd_cam`, the symlink from the udev rule in [mr_pinchy `setup/udev`](https://github.com/PinchyFamily/mr_pinchy/tree/main/setup/udev). Driver settings are in `config/camera.yaml`; `frame_id` is taken from `extrinsics.camera.child_frame` in the vehicle config so images match the robot description.
 
 ```bash
 ros2 launch mr_pinchy_bringup camera.launch.py
@@ -225,7 +225,7 @@ Vehicle-specific settings live in [`config/pinchy.yaml`](config/pinchy.yaml). Ed
 | `network` | MAVROS FCU URL, DVL connect delays (Nucleus host and password are in `secrets.yaml`) |
 | `sonar` | Water Linked sonar IP, UDP/network, acoustics, and topic names |
 | `subsystems` | Default enable flags for GNSS, sonar, DVL, MAVROS |
-| `extrinsics` | Static transforms from `base_link` to sonar, camera, and DVL frames |
+| `extrinsics` | Sensor frames relative to `base_link` (`xyz` in m, `rpy` = roll, pitch, yaw in rad); every entry becomes a fixed joint in the robot description |
 | `bridges` | DVL type, frames, depth topic, AHRS enable |
 
 Sonar `frame_id` defaults to `extrinsics.sonar.child_frame` when left empty in `pinchy.yaml`. Set `sonar.params_file` to an external YAML (same format as `config/sonar.yaml`) to replace the inline `sonar:` block entirely.
@@ -279,7 +279,7 @@ Each node accepts ROS parameters to override `frame_id`, input/output topics, an
 Declared in `package.xml`:
 
 - `launch`, `launch_ros`, `launch_xml`, `ament_index_python`, `rclpy`
-- `tf2_ros`
+- `tf2_ros`, `robot_state_publisher`
 - `geometry_msgs`, `nav_msgs`, `sensor_msgs`, `std_msgs`, `rtcm_msgs`
 - `python3-numpy`, `python3-yaml`
 

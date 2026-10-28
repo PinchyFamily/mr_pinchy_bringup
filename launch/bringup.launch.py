@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Full Mr Pinchy vehicle bringup: GNSS, FCU, sonar, DVL, camera, sensor bridges, and static TFs."""
+"""Full Mr Pinchy vehicle bringup: GNSS, FCU, sonar, DVL, camera, sensor bridges, and robot description."""
 import os
 import sys
 
@@ -18,7 +18,8 @@ from vehicle_config import (  # noqa: E402
     default_vehicle_config_path,
     load_nucleus_secrets,
     load_resolved_config,
-    static_transform_node,
+    load_vehicle_config,
+    robot_description,
 )
 
 
@@ -98,21 +99,15 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     ))
 
-    # --- Static TFs: base_link → sonar, camera, and DVL frames (from pinchy.yaml extrinsics) ---
-    base_frame = extrinsics['base_frame']
-    for key, node_name in (
-        ('sonar', 'base_link_to_sonar'),
-        ('camera', 'base_link_to_camera'),
-        ('dvl', 'base_link_to_dvl'),
-    ):
-        ext = extrinsics[key]
-        actions.append(static_transform_node(
-            node_name,
-            base_frame,
-            ext['child_frame'],
-            ext['xyz'],
-            ext['rpy'],
-        ))
+    # --- Robot description: fixed joints base_link → sensor frames (from pinchy.yaml extrinsics) ---
+    robot_name = (load_vehicle_config(vehicle_config_path).get('vehicle') or {}).get('name', 'pinchy')
+    actions.append(Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        parameters=[{'robot_description': robot_description(extrinsics, robot_name)}],
+        output='screen',
+    ))
 
     # --- DVL: Nucleus driver node, then timed TCP connect and start streaming ---
     dvl_enabled = _bool_to_launch(subsystems['dvl'])

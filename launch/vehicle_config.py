@@ -211,14 +211,30 @@ def load_resolved_config(vehicle_config_path, profile, overrides):
     }
 
 
-def static_transform_node(name, parent, child, xyz, rpy):
-    from launch_ros.actions import Node
+def robot_description(extrinsics, robot_name='pinchy'):
+    """Build a URDF with a fixed joint from the base frame to every extrinsics entry.
 
-    args = [str(v) for v in (*xyz, *rpy, parent, child)]
-    return Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name=name,
-        arguments=args,
-        output='screen',
-    )
+    ``rpy`` is roll, pitch, yaw in radians (URDF convention).
+    """
+    base = extrinsics['base_frame']
+    lines = [
+        '<?xml version="1.0"?>',
+        f'<robot name="{robot_name}">',
+        f'  <link name="{base}"/>',
+    ]
+    for ext in extrinsics.values():
+        if not isinstance(ext, dict):
+            continue
+        child = ext['child_frame'].lstrip('/')
+        xyz = ' '.join(str(float(v)) for v in ext.get('xyz', [0.0, 0.0, 0.0]))
+        rpy = ' '.join(str(float(v)) for v in ext.get('rpy', [0.0, 0.0, 0.0]))
+        lines += [
+            f'  <link name="{child}"/>',
+            f'  <joint name="{base}_to_{child}" type="fixed">',
+            f'    <parent link="{base}"/>',
+            f'    <child link="{child}"/>',
+            f'    <origin xyz="{xyz}" rpy="{rpy}"/>',
+            '  </joint>',
+        ]
+    lines.append('</robot>')
+    return '\n'.join(lines)
