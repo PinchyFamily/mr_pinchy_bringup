@@ -18,11 +18,24 @@
     # true: also store them in the sensor's flash (permanent, limited to 10000 saves).
     save_config_to_flash: false
 
-    # Message contents. Covariance diagonals are [x, y, z]; the defaults come from a pool test of another unit.
+    # Message contents. Covariance diagonals are [x, y, z].
     frame_id: "imu_link"
     imu_topic: "core/imu"
-    angular_velocity_covariance: [2.7474e-6, 2.7474e-6, 7.312e-6]
-    linear_acceleration_covariance: [4.1915e-4, 4.1915e-4, 1.8995e-5]
+    # Measured on unit A (destined for Mr Pinchy), 2026-10-27, on the bench, sensor still.
+    # Variance of 5 min of samples (75000) at configure_sample_rate 250 Hz and configure_lp_filter 66 Hz,
+    # taken with `ros2 run stim300 static_noise` (stim300 README, "Characterisation tools").
+    # Measured values are for these settings only: measure again if the rate or the filter changes.
+    # Measured: gyro [2.81e-7, 2.80e-7, 1.91e-7], accelerometer [1.17e-4, 1.54e-4, 1.22e-4] (rounded below).
+    # A 3 h still recording of the same unit and settings gave the same noise level as the datasheet:
+    #   gyro angle random walk 0.14-0.17 deg/sqrt(h) (datasheet 0.15),
+    #   accelerometer velocity random walk 0.066-0.085 m/s/sqrt(h) (datasheet 0.07).
+    # Gyro bias instability was not resolved (upper bound 0.55-0.80 deg/h, datasheet 0.3).
+    angular_velocity_covariance: [2.8e-7, 2.8e-7, 1.9e-7]
+    linear_acceleration_covariance: [1.2e-4, 1.5e-4, 1.2e-4]
+    # Previous values, kept for reference. They came from a pool test of another unit (the driver's
+    # built-in defaults, from upstream smarc-project/stim300), not measured on unit A:
+    #   angular_velocity_covariance: [2.7474e-6, 2.7474e-6, 7.312e-6]
+    #   linear_acceleration_covariance: [4.1915e-4, 4.1915e-4, 1.8995e-5]
 
     # Loop rate used until the driver has read the sensor's own configuration.
     sample_rate: 250
