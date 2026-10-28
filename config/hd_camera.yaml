@@ -1,20 +1,20 @@
-# Parameters for usb_cam node — DWE exploreHD 3.0
+# Parameters for the exploreHD camera nodes (DWE exploreHD 3.0)
 # Ref: https://docs.dwe.ai/exploreHD/specs/exploreHD
-/**:
+# frame_id must match extrinsics.camera.child_frame in pinchy.yaml (the robot description frame).
+
+/**/hd_camera_h264:
   ros__parameters:
-    video_device: "/dev/explorehd_cam"
-    framerate: 30.0
-    image_width: 640
-    image_height: 480
-    pixel_format: "yuyv2rgb"
-    camera_name: "hd_camera"
-    # Must match extrinsics.camera.child_frame in pinchy.yaml (the robot description frame).
+    # H.264 UVC node (index 2) of the camera. If missing, the node falls back to
+    # /dev/v4l/by-id/*exploreHD*-video-index2.
+    device: "/dev/explorehd_h264"
+    width: 1920
+    height: 1080
+    framerate: 30       # the camera lowers this itself in low light (~20 fps indoors)
     frame_id: "hd_camera_link"
-    io_method: "mmap"
-    camera_info_url: ""
-    brightness: -1
-    contrast: -1
-    saturation: -1
-    sharpness: -1
-    autofocus: false
-    autowhitebalance: true
+
+/**/hd_camera_decoder:
+  ros__parameters:
+    width: 640          # decoded image size (any size; ffmpeg scales)
+    height: 360
+    rate: 5.0           # decoded images per second; 0 = every frame
+    frame_id: "hd_camera_link"

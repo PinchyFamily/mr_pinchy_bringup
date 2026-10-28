@@ -1,4 +1,4 @@
-"""Launch the exploreHD USB camera and a web_video_server for viewing it from any browser."""
+"""Launch the exploreHD camera: H.264 packets for recording, plus an on-demand decoded feed."""
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -16,12 +16,17 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'params_file',
             default_value=os.path.join(pkg_dir, 'config', 'hd_camera.yaml'),
-            description='usb_cam parameter YAML file',
+            description='Parameter YAML for the hd_camera_h264 and hd_camera_decoder nodes',
         ),
         DeclareLaunchArgument(
             'namespace',
             default_value='hd_camera',
-            description='Node namespace (the camera publishes <namespace>/image_raw)',
+            description='Node namespace (publishes <namespace>/h264 and <namespace>/image_decoded)',
+        ),
+        DeclareLaunchArgument(
+            'decode',
+            default_value='true',
+            description='Start the decoder node (idle, no CPU, until image_decoded has a subscriber)',
         ),
         DeclareLaunchArgument(
             'web_server',
@@ -39,10 +44,20 @@ def generate_launch_description():
             description='web_video_server HTTP port (3d_camera.launch.py uses 8080)',
         ),
         Node(
-            package='usb_cam',
-            executable='usb_cam_node_exe',
-            name='usb_cam',
+            package='mr_pinchy_bringup',
+            executable='hd_camera_h264.py',
+            name='hd_camera_h264',
             namespace=LaunchConfiguration('namespace'),
+            parameters=[LaunchConfiguration('params_file')],
+            output='screen',
+            emulate_tty=True,
+        ),
+        Node(
+            package='mr_pinchy_bringup',
+            executable='hd_camera_decoder.py',
+            name='hd_camera_decoder',
+            namespace=LaunchConfiguration('namespace'),
+            condition=IfCondition(LaunchConfiguration('decode')),
             parameters=[LaunchConfiguration('params_file')],
             output='screen',
             emulate_tty=True,

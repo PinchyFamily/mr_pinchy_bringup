@@ -14,6 +14,8 @@ install(PROGRAMS
   scripts/nucleus_imu_bridge.py
   scripts/nucleus_ahrs_bridge.py
   scripts/nucleus_ekf.py
+  scripts/hd_camera_h264.py
+  scripts/hd_camera_decoder.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

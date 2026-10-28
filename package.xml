@@ -19,7 +19,7 @@
   <exec_depend>mavros</exec_depend>
   <exec_depend>waterlinked_sonar_3d15</exec_depend>
   <exec_depend>nucleus_driver_ros2</exec_depend>
-  <exec_depend>usb_cam</exec_depend>
+  <exec_depend>ffmpeg</exec_depend>
   <exec_depend>image_transport</exec_depend>
   <exec_depend>interfaces</exec_depend>
   <exec_depend>smarc_msgs</exec_depend>

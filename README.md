@@ -11,7 +11,7 @@ ROS 2 (Humble) bringup package for **Mr Pinchy** — the single entry point for 
   - `waterlinked_sonar_3d15`
   - `nucleus_driver_ros2` and `interfaces` (from [nucleus_driver](https://github.com/nortekgroup/nucleus_driver))
   - `smarc_msgs`
-  - `realsense2_camera`, `usb_cam` and `web_video_server` (only for the camera launch files)
+  - `realsense2_camera`, `web_video_server` and `ffmpeg` (only for the camera launch files)
 
 ## Building
 
@@ -32,7 +32,7 @@ source install/setup.bash
 | `sonar.launch.py` | **Sonar only** — Water Linked 3D15 driver | Testing sonar independently |
 | `imu.launch.py` | **IMU only** — STIM300 driver, sets the sensor sample rate | Testing the IMU independently |
 | `3d_camera.launch.py` | **3D camera only** — RealSense D435i plus a browser video server (port 8080) | Viewing depth/colour from a non-ROS device (diagnostics) |
-| `hd_camera.launch.py` | **HD camera only** — exploreHD `usb_cam` driver plus a browser video server (port 8081) | Viewing the HD camera from a non-ROS device (diagnostics) |
+| `hd_camera.launch.py` | **HD camera only** — exploreHD H.264 packets for recording, on-demand decoded feed, browser video server (port 8081) | Recording the camera, piloting over the tether, or viewing from a non-ROS device |
 | `mavros.launch.py` | **FCU link only** — PX4 MAVROS node | FCU debugging; included by bringup |
 | `sensors_bridge.launch.py` | **Bridge nodes only** — DVL/depth/IMU/AHRS converters | Bridge debugging; included by bringup |
 | `carl.launch.py` | **DVL + sonar + EKF** — Nucleus driver, Water Linked sonar, `nucleus_ekf.py`, `base_link` → `sonar_link` TF | DVL dead-reckoning with sonar, without GNSS or MAVROS |
@@ -213,33 +213,78 @@ ros2 topic hz /camera/camera/color/image_raw
 ros2 launch mr_pinchy_bringup hd_camera.launch.py
 ```
 
-Starts the exploreHD USB camera (`usb_cam`, YUYV 640x480 at 30 fps, settings in [`config/hd_camera.yaml`](config/hd_camera.yaml)) and its own `web_video_server` on port 8081, so it can run alongside the 3D camera. Open `http://<host>:8081`. The same no-authentication warning applies.
+Records and shows the DWE exploreHD camera without using the Pi's CPU unless someone is watching. The camera encodes H.264 itself (UVC node index 2), so nothing is decoded or re-encoded on the vehicle.
 
-The camera supports MJPEG up to 1920x1080, but `usb_cam`'s `mjpeg2rgb` decoder segfaults on this Jazzy/arm64 install, so the config uses uncompressed `yuyv2rgb` (limited to 640x480 by the camera). Revisit if a fixed `usb_cam` is released.
+| Node | Topic | Purpose | Cost |
+|---|---|---|---|
+| `hd_camera_h264` | `/hd_camera/h264` (`sensor_msgs/CompressedImage`, `format: h264`) | Full resolution, full rate. **Record this.** | ~1% of one core |
+| `hd_camera_decoder` | `/hd_camera/image_decoded` (`sensor_msgs/Image`, `bgr8`, best effort) | Decoded images for piloting, with your choice of size and rate | Zero while unwatched; ~17% of one core while decoding |
 
-The camera is opened as `/dev/explorehd_cam`, a symlink from a udev rule (`/etc/udev/rules.d/99-explorehd-camera.rules`).
+**Recording.** Each message is one H.264 access unit at 1920x1080 and about 20 fps indoors (the camera lowers its rate in low light), roughly 0.85 MB/s or 3 GB/hour. Record only this topic; the decoded one is derived from it:
+
+```bash
+ros2 bag record -s mcap /hd_camera/h264
+```
+
+To recover the video offline, write the message data to one file and let ffmpeg read it:
+
+```python
+import rosbag2_py
+from rclpy.serialization import deserialize_message
+from sensor_msgs.msg import CompressedImage
+
+reader = rosbag2_py.SequentialReader()
+reader.open(rosbag2_py.StorageOptions(uri='bag', storage_id='mcap'), rosbag2_py.ConverterOptions('', ''))
+with open('video.h264', 'wb') as out:
+    while reader.has_next():
+        _, data, _ = reader.read_next()
+        out.write(bytes(deserialize_message(data, CompressedImage).data))
+```
+
+```bash
+ffmpeg -i video.h264 -c:v copy video.mp4   # or decode: ffmpeg -i video.h264 frame_%05d.png
+```
+
+The camera sends a keyframe about every 30 frames and repeats the stream headers before every frame, so a recording can be decoded from any point. Frames before the first keyframe in a bag cannot be decoded, so up to the first ~1.5 s of a recording is lost. Message stamps are the time each frame arrived on the Pi, not the sensor exposure time.
+
+**Piloting feed.** The decoder only runs while `/hd_camera/image_decoded` has a subscriber; it stops a couple of seconds after the last one leaves. It can run on any machine on the ROS network that has this package and `ffmpeg` (not yet tried topside), so decode there to keep the Pi idle:
+
+```bash
+ros2 run mr_pinchy_bringup hd_camera_decoder.py --ros-args -r __ns:=/hd_camera -p width:=960 -p height:=540 -p rate:=10.0
+```
+
+Size and rate are the `width`, `height` and `rate` parameters (defaults 640x360 at 5 Hz, set in [`config/hd_camera.yaml`](config/hd_camera.yaml); `rate:=0` publishes every frame). H.264 frames depend on earlier ones, so every frame is decoded whatever the rate: they reduce the image size and network use, not the decode cost. A new viewer waits about 3 s for the first picture. The output is best effort, so subscribers must use a best-effort QoS (in `web_video_server` add `qos_profile=sensor_data`).
+
+Browser view (also served by this launch file, no authentication, port 8081):
+
+```
+http://<host>:8081/stream?topic=/hd_camera/image_decoded&qos_profile=sensor_data&type=mjpeg
+```
 
 Arguments:
 
 | Argument | Default | Description |
 |---|---|---|
-| `params_file` | `config/hd_camera.yaml` | `usb_cam` parameter YAML |
-| `namespace` | `hd_camera` | Node namespace (publishes `/hd_camera/image_raw`) |
-| `web_server` | `true` | Start a `web_video_server` (`false` if one is already running) |
+| `params_file` | `config/hd_camera.yaml` | Parameters for both nodes |
+| `namespace` | `hd_camera` | Node namespace |
+| `decode` | `true` | Start the decoder node (it is idle until watched) |
+| `web_server` | `true` | Start a `web_video_server` (`false` if one is already running; `bringup.launch.py` sets it to `false`) |
 | `address` | `0.0.0.0` | `web_video_server` bind address |
 | `port` | `8081` | `web_video_server` HTTP port |
 
-Install the driver:
+The publisher opens `/dev/explorehd_h264` and, if that does not exist, `/dev/v4l/by-id/*exploreHD*-video-index2`. To get a stable name add this line to `/etc/udev/rules.d/99-explorehd-camera.rules` (next to the existing `explorehd_cam` rule): `SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="6366", ATTR{index}=="2", SYMLINK+="explorehd_h264", TAG+="uaccess"`.
 
-```bash
-sudo apt install ros-jazzy-usb-cam ros-jazzy-web-video-server
-```
+Requires `ffmpeg` and `ros-jazzy-web-video-server` (`sudo apt install ffmpeg ros-jazzy-web-video-server`).
 
 Verify output:
 
 ```bash
-ros2 topic hz /hd_camera/image_raw
+ros2 topic hz /hd_camera/h264
 ```
+
+Notes:
+- The camera's MJPEG node (`/dev/explorehd_cam`) is not used. Streaming it together with H.264 corrupted the H.264 frames in a test, and `usb_cam` returned corrupt frames from it on this install.
+- The camera's H.264 node is a normal V4L2 device, so only one program should read it; stop other consumers (such as mavlink-camera-manager) first.
 
 ### Sensor bridges
 
@@ -335,7 +380,7 @@ Each node accepts ROS parameters to override `frame_id`, input/output topics, an
 | `mavros` | FCU communication (PX4) |
 | `waterlinked_sonar_3d15` | 3D sonar driver |
 | `nucleus_driver_ros2`, `interfaces` | Nortek Nucleus DVL driver + messages |
-| `usb_cam`, `image_transport` | exploreHD camera driver (`ros-humble-usb-cam`) |
+| `ffmpeg` | exploreHD H.264 capture and decode |
 | `smarc_msgs` | SMARC message types used by DVL bridge |
 
 ### ROS / system dependencies
@@ -354,7 +399,7 @@ Vehicle-specific parameters live in `config/`. Edit these instead of modifying l
 | File | Purpose |
 |---|---|
 | `pinchy.yaml` | Vehicle network IPs, sonar driver settings, extrinsics, bridge defaults, subsystem enables |
-| `hd_camera.yaml` | `usb_cam` settings for the exploreHD camera (device, resolution, pixel format, frame_id) |
+| `hd_camera.yaml` | exploreHD camera: capture device, resolution and frame rate; decoded size and rate |
 | `sonar.yaml` | Optional legacy sonar params file (use via `sonar.params_file` or `sonar_params_file:=`) |
 | `gnss.yaml` | u-blox device family, measurement rates, USB message outputs, non-secret NTRIP settings (reference position, GGA interval) |
 | `secrets.yaml` | **Untracked.** All vehicle credentials in one place (see below) |
